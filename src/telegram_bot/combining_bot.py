@@ -32,6 +32,7 @@ async def summarize(update: Update, context: ContextTypes.DEFAULT_TYPE):
     messages = context.chat_data.setdefault("messages", [])
     summary = summarize_messages(messages)
     await context.bot.send_message(chat_id=update.effective_chat.id, text=summary)
+    context.chat_data.set("messages", [])
 
 
 async def save_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
