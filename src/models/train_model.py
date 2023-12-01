@@ -48,8 +48,8 @@ def compute_metrics(eval_pred):
 
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune an ML model for summarization.")
-    parser.add_argument("--train_dataset_size", type=int, default=1000, help="Size of the training dataset.")
-    parser.add_argument("--validation_dataset_size", type=int, default=10, help="Size of the validation dataset.")
+    parser.add_argument("--train_dataset_size", type=int, default=13000, help="Size of the training dataset.")
+    parser.add_argument("--validation_dataset_size", type=int, default=100, help="Size of the validation dataset.")
     parser.add_argument("--batch_size", type=int, default=3, help="Batch size for training and evaluation.")
     parser.add_argument("--num_epochs", type=int, default=20, help="Number of training epochs.")
     parser.add_argument("--checkpoint", type=str, default="IlyaGusev/rut5_base_headline_gen_telegram", help="Checkpoint to load from Hugging Face Hub.")
@@ -95,7 +95,7 @@ def main():
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=args.checkpoint)
 
     training_args = Seq2SeqTrainingArguments(
-        output_dir="my_awesome_billsum_model",
+        output_dir="second_llm_finetune_rubert",
         evaluation_strategy="epoch",
         learning_rate=2e-5,
         per_device_train_batch_size=args.batch_size,
@@ -120,7 +120,7 @@ def main():
     )
 
     trainer.train()
-    trainer.push_to_hub()
+    # trainer.push_to_hub()
 
     n_samples = args.validation_dataset_size
     validation_data = dataset_dict["validation"].select(range(n_samples))
