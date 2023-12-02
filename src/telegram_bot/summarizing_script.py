@@ -46,7 +46,7 @@ def form_prompt(messages):
             user_name = message.forward_from.full_name
             id2user[message.forward_from.id] = [user_name, number]
         else:
-            number = id2user[message.from_user.id][1]
+            number = id2user[message.forward_from.id][1]
 
         prompt_parts.append(f"#Человек{number}#: {message.text}")  # like #Человек2#:
 
@@ -59,7 +59,8 @@ def form_prompt(messages):
 def summarize_messages(messages):
     prompt, persons_list = form_prompt(messages)
     print("Prompt:\n", prompt)
-    model_output = summarizer(prompt)
+    model_output = summarizer(prompt)[0]["summary_text"]
+    print("model output:\n", model_output)
     result_text = convert_model_output_to_text(model_output, persons_list)
     print("Result:\n", result_text)
     return result_text

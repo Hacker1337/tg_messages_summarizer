@@ -1,7 +1,9 @@
 tg_messages_summarizer
 ==============================
 
-Finetuning large transformer to summarizer many unread messages from telegram chats. Supports russian language. Access via telegram bot.
+Finetuning large transformer to summarizer many unread messages from telegram chats. Supports russian and english languages. Access via telegram bot [@FloodSumBot](https://t.me/FloodSumBot).
+
+<img alt="demonstration of work" src=reports/figures/demo.png width=200>
 
 Project Organization
 ------------
