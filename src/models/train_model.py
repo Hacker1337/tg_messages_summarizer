@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, Seq2SeqTrainingArguments, Seq2SeqTrainer, DataCollatorForSeq2Seq
 from transformers import pipeline
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_dataset
 import evaluate
 import wandb
 import numpy as np
@@ -52,19 +52,23 @@ def main():
     parser.add_argument("--validation_dataset_size", type=int, default=100, help="Size of the validation dataset.")
     parser.add_argument("--batch_size", type=int, default=3, help="Batch size for training and evaluation.")
     parser.add_argument("--num_epochs", type=int, default=20, help="Number of training epochs.")
-    parser.add_argument("--checkpoint", type=str, default="IlyaGusev/rut5_base_headline_gen_telegram", help="Checkpoint to load from Hugging Face Hub.")
-    parser.add_argument("--data_path", type=str, default=".", help="path to dataset files")
+    parser.add_argument("--checkpoint", type=str, default="IlyaGusev/rut5_base_headline_gen_telegram", help="Checkpoint to load from HuggingFace Hub.")
+    parser.add_argument("--data_path", type=str, default=None, help="path to dataset files")
+    parser.add_argument("--dataset_cloud_name", type=str, default="Hacker1337/ru_dialogsum", help="name of the dataset in HuggingFace Hub.")
     args = parser.parse_args()
 
-    data_val = pd.read_csv(os.path.join(args.data_path, "output_validation.csv"))
-    data_train = pd.read_csv(os.path.join(args.data_path, "output_train.csv"))
+    if args.data_path is not None:
+        data_val = pd.read_csv(os.path.join(args.data_path, "output_validation.csv"))
+        data_train = pd.read_csv(os.path.join(args.data_path, "output_train.csv"))
 
-    dataset_train = make_dataset(data_train)
-    dataset_val = make_dataset(data_val)
-    dataset_dict = DatasetDict({
-      "train": dataset_train,
-      "validation": dataset_val,
-    })
+        dataset_train = make_dataset(data_train)
+        dataset_val = make_dataset(data_val)
+        dataset_dict = DatasetDict({
+        "train": dataset_train,
+        "validation": dataset_val,
+        })
+    else:
+        dataset_dict = load_dataset(args.dataset_cloud_name) 
 
     # Model and tokenizer loading
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
