@@ -91,3 +91,5 @@ target/
 notebooks/my_awesome_billsum_model
 notebooks/T5_model_full_dataset_10epoch_training
 notebooks/wandb
+
+env

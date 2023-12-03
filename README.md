@@ -5,6 +5,18 @@ Finetuning large transformer to summarizer many unread messages from telegram ch
 
 <img alt="demonstration of work" src=reports/figures/demo.png width=200>
 
+To install the environment\
+`conda create -f environment.yaml`
+
+Finetuning language model:\
+`python src/models/train_model.py   --batch_size 1 --checkpoint IlyaGusev/rubert_telegram_headlines`
+
+Running bot with finetuned model:\
+`python src/telegram_bot/combining_bot.py`
+
+Training logs are available in wandb platform https://wandb.ai/amirfvb/tg-summarizer
+
+
 Project Organization
 ------------
 
@@ -57,5 +69,3 @@ Project Organization
 --------
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
-
-Training logs are available in wandb platform https://wandb.ai/amirfvb/tg-summarizer
