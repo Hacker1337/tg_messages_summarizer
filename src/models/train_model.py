@@ -14,41 +14,10 @@ def make_dataset(dataframe):
     dataset = Dataset.from_pandas(data)
     return dataset
 
-def preprocess_function(examples):
-    prefix = ""
-    inputs = [prefix + doc for doc in examples["dialogue"]]
-    model_inputs = tokenizer(inputs, max_length=1024, truncation=True)
-
-    labels = tokenizer(text_target=examples["summary"], max_length=128, truncation=True)
-
-    model_inputs["labels"] = labels["input_ids"]
-    return model_inputs
-
-def compute_metrics(eval_pred):
-    predictions, labels = eval_pred
-    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
-    decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-    result_rouge = rouge.compute(predictions=decoded_preds,
-                        references=decoded_labels,
-                        tokenizer=tokenizer.tokenize)
-
-    bleu_results = bleu.compute(predictions=decoded_preds, references=decoded_labels, tokenizer=tokenizer.tokenize)
-    result = {
-        **{"rouge_" + k: v for k, v in result_rouge.items()},
-        **{"bleu_" + k: v for k, v in bleu_results.items()},
-    }
-    prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
-    result["gen_len"] = np.mean(prediction_lens)
-
-    return {k: round(v, 4) if isinstance(v, float) else v
-            for k, v in result.items()}
 
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune an ML model for summarization.")
-    parser.add_argument("--train_dataset_size", type=int, default=13000, help="Size of the training dataset.")
+    parser.add_argument("--train_dataset_size", type=int, default=12460, help="Size of the training dataset.")
     parser.add_argument("--validation_dataset_size", type=int, default=100, help="Size of the validation dataset.")
     parser.add_argument("--batch_size", type=int, default=3, help="Batch size for training and evaluation.")
     parser.add_argument("--num_epochs", type=int, default=20, help="Number of training epochs.")
@@ -74,28 +43,62 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
     model = AutoModelForSeq2SeqLM.from_pretrained(args.checkpoint)
 
-    n_samples = args.validation_dataset_size
+    n_samples = 10
     validation_data = dataset_dict["validation"].select(range(n_samples))
 
-    summarizer = pipeline("summarization", model=model, tokenizer=tokenizer, device="cuda")
+    # summarizer = pipeline("summarization", model=model, tokenizer=tokenizer)
 
-    table_before_fine_tuning = wandb.Table(columns=["Input Text", "Target Summary", "Generated Summary"])
+    # table_before_fine_tuning = wandb.Table(columns=["Input Text", "Target Summary", "Generated Summary"])
 
-    for example in validation_data:
-        input_text = example["dialogue"]
-        target_summary = example["summary"]
-        generated_summary = summarizer(input_text, max_length=150, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
-        table_before_fine_tuning.add_data(input_text, target_summary, generated_summary[0]["summary_text"])
-
-    wandb.log({"summarization_before_fine_tuning": table_before_fine_tuning})
+    # for example in validation_data:
+    #     input_text = example["dialogue"]
+    #     target_summary = example["summary"]
+    #     generated_summary = summarizer(input_text, max_length=100, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
+    #     table_before_fine_tuning.add_data(input_text, target_summary, generated_summary[0]["summary_text"])
+    
+    wandb.init(project="tg-summarizer", resume=True)
+    # wandb.log({"summarization_before_fine_tuning": table_before_fine_tuning})
 
     # Preprocess
+    def preprocess_function(examples):
+        prefix = ""
+        inputs = [prefix + doc for doc in examples["dialogue"]]
+        model_inputs = tokenizer(inputs, max_length=1024, truncation=True)
+
+        labels = tokenizer(text_target=examples["summary"], max_length=128, truncation=True)
+
+        model_inputs["labels"] = labels["input_ids"]
+        return model_inputs
+    
     tokenized_dataset = dataset_dict.map(preprocess_function, batched=True)
 
     # Evaluate
     rouge = evaluate.load("rouge")
     bleu = evaluate.load("bleu")
 
+
+    def compute_metrics(eval_pred):
+        predictions, labels = eval_pred
+        predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
+        decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+        result_rouge = rouge.compute(predictions=decoded_preds,
+                            references=decoded_labels,
+                            tokenizer=tokenizer.tokenize)
+
+        bleu_results = bleu.compute(predictions=decoded_preds, references=decoded_labels, tokenizer=tokenizer.tokenize)
+        result = {
+            **{"rouge_" + k: v for k, v in result_rouge.items()},
+            **{"bleu_" + k: v for k, v in bleu_results.items()},
+        }
+        prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in predictions]
+        result["gen_len"] = np.mean(prediction_lens)
+
+        return {k: round(v, 4) if isinstance(v, float) else v
+                for k, v in result.items()}
+    
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=args.checkpoint)
 
     training_args = Seq2SeqTrainingArguments(
@@ -106,7 +109,7 @@ def main():
         per_device_eval_batch_size=args.batch_size,
         logging_steps=100,
         weight_decay=0.01,
-        save_total_limit=3,
+        save_total_limit=2,
         num_train_epochs=args.num_epochs,
         predict_with_generate=True,
         generation_max_length=100,
@@ -126,20 +129,19 @@ def main():
     trainer.train()
     # trainer.push_to_hub()
 
-    n_samples = args.validation_dataset_size
-    validation_data = dataset_dict["validation"].select(range(n_samples))
-
-    summarizer = pipeline("summarization", model=model, tokenizer=tokenizer, device="cuda")
+    summarizer = pipeline("summarization", model=model, tokenizer=tokenizer)
 
     table_after_fine_tuning = wandb.Table(columns=["Input Text", "Target Summary", "Generated Summary"])
 
     for example in validation_data:
         input_text = example["dialogue"]
         target_summary = example["summary"]
-        generated_summary = summarizer(input_text, max_length=150, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
+        generated_summary = summarizer(input_text, max_length=100, min_length=50, length_penalty=2.0, num_beams=4, early_stopping=True)
         table_after_fine_tuning.add_data(input_text, target_summary, generated_summary[0]["summary_text"])
 
     wandb.log({"summarization_after_fine_tuning": table_after_fine_tuning})
+    
+    
 
 if __name__ == "__main__":
     main()

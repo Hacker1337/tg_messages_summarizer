@@ -2,6 +2,9 @@ import re
 from transformers import pipeline
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import yaml
+import json
+import logging
+
 
 with open("sum_config.yaml") as file:
     config = yaml.safe_load(file)
@@ -29,9 +32,6 @@ def convert_model_output_to_text(model_output, names):
             return names[index]
         else:
             return match.group(0)
-    print(model_output)
-    print()
-    print(names)
     result = pattern.sub(replace_match, model_output)
     return result
 
@@ -41,6 +41,13 @@ def form_prompt(messages):
     id2user = {}
 
     for message in messages:
+        if not (hasattr(message, 'forward_from') and message.forward_from):
+            logging.warn("message has no forwarded field, while only such messages shoud be provided. Skip this message. Message is:\n"+str(message))
+            continue
+        if not hasattr(message.forward_from, "id"):
+            logging.warn("forwarded field has no id. Skip this message. Message is:\n" + str(message) + "\nForward field is:\n" + str(message.forward_from))
+            continue
+
         if message.forward_from.id not in id2user:
             number = len(id2user) + 1
             user_name = message.forward_from.full_name
@@ -58,9 +65,17 @@ def form_prompt(messages):
 
 def summarize_messages(messages):
     prompt, persons_list = form_prompt(messages)
-    print("Prompt:\n", prompt)
+    logging.debug("Prompt:\n" + prompt)
     model_output = summarizer(prompt)[0]["summary_text"]
-    print("model output:\n", model_output)
     result_text = convert_model_output_to_text(model_output, persons_list)
-    print("Result:\n", result_text)
+    logging.info("Prompt:\n" + prompt + "\nResult:\n" + result_text)
+
+    data = {
+        "prompt": prompt,
+        "model_output": model_output,   # store data in anonymous way
+    }
+    with open("logs/work_results.json", 'a', encoding="utf8") as file:
+        json.dump(data, file, ensure_ascii=False)
+        file.write("\n")
+
     return result_text
